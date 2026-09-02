@@ -1,0 +1,9 @@
+{
+  "id": "bug_001",
+  "language": "python",
+  "description": "Fixture schema smoke case; replace with an immutable real repository fixture before publishing benchmark results.",
+  "repository": "fixture://python-basic",
+  "reproduction_command": ["python", "-m", "pytest", "-q"],
+  "expected": {"reproduces": true},
+  "constraints": {"network": false, "max_iterations": 3, "max_patch_lines": 300}
+}
