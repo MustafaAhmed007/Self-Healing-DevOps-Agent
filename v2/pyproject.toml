@@ -1,3 +1,7 @@
+[build-system]
+requires = ["setuptools>=75", "wheel"]
+build-backend = "setuptools.build_meta"
+
 [project]
 name = "self-healing-devops-agent"
 version = "0.3.0"
@@ -16,11 +20,14 @@ dev = ["pytest>=8.0", "ruff>=0.6", "mypy>=1.10"]
 [project.scripts]
 shda = "app.cli:main"
 
+[tool.setuptools.packages.find]
+include = ["app*", "evals*"]
+exclude = ["console*"]
+
 [tool.pytest.ini_options]
 pythonpath = ["."]
 testpaths = ["tests"]
 
 [tool.ruff]
 line-length = 100
-
 target-version = "py311"
