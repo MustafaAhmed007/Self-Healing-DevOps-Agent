@@ -33,16 +33,20 @@ This is the canonical implementation ledger. **Built** means code/configuration 
 - [x] Human approval state model/API
 - [x] Secure Git push authentication without token in argv/remotes
 - [x] FastAPI lifecycle endpoints
+- [x] Signed GitHub webhook verification endpoint
+- [x] Language adapter registry: Python/Node/Go/Rust/Java
+- [x] Deterministic model/strategy router foundation
+- [x] Evidence-backed strategy promotion ledger
 - [x] CLI
 - [x] Executable benchmark fixtures and raw report writer
+- [x] 100-case deterministic benchmark generator
 - [x] Operator console
 - [x] Docker Compose local stack
 - [x] CI + dependency audit workflow
-- [x] Architecture/threat/operations documentation surfaces
+- [x] Adversarial command/secret regression tests
+- [x] Architecture/threat/operations documentation
 
 ## Operational acceptance still required
-
-These cannot honestly be marked operational until their external dependencies are configured and evidence is retained:
 
 - [ ] Real GitHub App/token + disposable-repository PR acceptance test
 - [ ] Docker sandbox acceptance on a hardened host
@@ -52,11 +56,11 @@ These cannot honestly be marked operational until their external dependencies ar
 - [ ] OpenTelemetry/Langfuse live traces
 - [ ] Gitleaks/Semgrep/Trivy installed and exercised against fixtures
 - [ ] High-risk approval + persistent resume workflow
-- [ ] 100+ case benchmark with retained raw results
+- [ ] Execute generated 100+ benchmark cases and retain raw results
 - [ ] Stronger microVM sandbox backend
-- [ ] GitHub App/webhook ingestion
-- [ ] Adversarial prompt-injection/repository-escape suite
-- [ ] Multi-tenant isolation/load testing
+- [ ] Production GitHub webhook event-to-job dispatch
+- [ ] Full adversarial prompt-injection/repository-escape campaign
+- [ ] Multi-tenant isolation/load testing and production auth
 
 ## Evidence rule
 
