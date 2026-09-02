@@ -1,0 +1,26 @@
+services:
+  api:
+    build: .
+    ports: ["8000:8000"]
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    deploy:
+      resources:
+        limits:
+          cpus: "1.0"
+          memory: 512M
+          pids: 128
+  redis:
+    image: redis:7-alpine
+    read_only: true
+    cap_drop: [ALL]
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: shda
+      POSTGRES_USER: shda
+      POSTGRES_PASSWORD: change-me
+    volumes: ["pgdata:/var/lib/postgresql/data"]
+volumes:
+  pgdata:
