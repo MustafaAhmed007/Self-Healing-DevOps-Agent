@@ -1,9 +1,13 @@
 {
   "id": "bug_001",
   "language": "python",
-  "description": "Fixture schema smoke case; replace with an immutable real repository fixture before publishing benchmark results.",
-  "repository": "fixture://python-basic",
-  "reproduction_command": ["python", "-m", "pytest", "-q"],
-  "expected": {"reproduces": true},
-  "constraints": {"network": false, "max_iterations": 3, "max_patch_lines": 300}
+  "description": "Off-by-one greeting counter.",
+  "test_command": ["python", "-m", "pytest", "-q"],
+  "files": {
+    "app.py": "def greet_count(names):\n    return len(names) - 1\n",
+    "test_app.py": "from app import greet_count\n\ndef test_greet_count():\n    assert greet_count(['a', 'b', 'c']) == 3\n"
+  },
+  "expected_fix": {
+    "app.py": "def greet_count(names):\n    return len(names)\n"
+  }
 }
