@@ -6,20 +6,69 @@
 
 ## What this is
 
-Self-Healing DevOps Agent turns a software issue into a controlled repair attempt:
+Self-Healing DevOps Agent turns a software issue into a controlled repair transaction:
 
 ```text
 Issue → Context → Immutable Checkout → Reproduce → Diagnose → Patch → Policy
      → Security Gates → Verify → Reflect (bounded) → Evidence → PR
 ```
 
-The design goal is **safe autonomy, not blind autonomy**. Repository content, issue text, generated output, and tool output are untrusted data. Deterministic policy controls what the system is allowed to execute or mutate. Model confidence never counts as proof of correctness.
+The design goal is **safe, evidence-driven autonomy — not blind autonomy**. Repository content, issue text, generated output, and tool output are untrusted data. Deterministic policy controls what the system is allowed to execute or mutate. Model confidence never counts as proof of correctness.
 
-## Current release
+## Current release and versioning
 
-**v0.3 engineering-complete control-plane target.** The repository now contains the complete reference architecture and implementation surfaces for the repair loop, persistence, queueing, sandboxing, security gates, verification, evidence, benchmark execution, API, CLI, observability hooks, PR publication, and operator console.
+**Current implementation: v0.3 — engineering-complete reference architecture.**
 
-> **Important:** provider-backed integrations (GitHub credentials, PostgreSQL, Redis, Docker, scanners, LLMs and observability exporters) require their external services to be configured. The repository never fabricates benchmark or production measurements. CI and benchmark reports are evidence gates.
+The repository grew through earlier V0.1/V0.2 construction stages. The `v2/` directory is retained as the implementation workspace name from that evolution; it does **not** mean that the project is currently “V2”. The authoritative release/version is the package version in `v2/pyproject.toml`, currently **0.3.0**.
+
+In other words:
+
+```text
+V0.1 foundation
+      ↓
+V0.2 repair-loop vertical slice
+      ↓
+V0.3 current reference implementation  ← YOU ARE HERE
+      ↓
+Future production hardening / hosted releases
+```
+
+The codebase contains the core reference architecture and implementation surfaces for repair orchestration, persistence adapters, queueing, sandboxing, security gates, verification, evidence, benchmarks, API, CLI, observability hooks, PR publication, and the operator console.
+
+> **Important:** “built in the repository” and “operational in a live environment” are intentionally different states. GitHub credentials, PostgreSQL, Redis, Docker, scanners, LLM providers, and observability backends require external configuration. The repository never fabricates production measurements.
+
+## Technology stack
+
+| Layer | Technology | Role |
+|---|---|---|
+| Language | **Python 3.11+** | Core agent/runtime implementation |
+| API | **FastAPI + Uvicorn** | Control-plane API and service runtime |
+| Data validation | **Pydantic v2** | Typed repair state, contracts, configuration |
+| Agent orchestration | **LangGraph boundary** | Stateful graph execution, checkpoint/HITL integration path |
+| Model gateway | **LiteLLM-compatible** | Provider-neutral LLM routing and structured generation |
+| Local inference | **Ollama-compatible path** | Optional local/private model execution |
+| Database | **PostgreSQL + psycopg** | Durable jobs, runs, evidence metadata, approvals |
+| Queue | **Redis** | Background repair jobs, coordination, future distributed workers |
+| Sandbox | **Docker** | Default isolated execution boundary |
+| Strong isolation | **Firecracker / Kata / gVisor class** | Production hardening path for hostile workloads |
+| SCM | **Git + GitHub API** | Immutable checkout, branches, commits, pull requests |
+| Verification | **pytest / project-native commands** | Baseline, patch and regression verification |
+| Security | **Gitleaks / Semgrep / Trivy / CodeQL adapters** | Secrets, SAST, dependency and code scanning |
+| Observability | **OpenTelemetry + Langfuse-compatible path** | Traces, metrics, logs, model/tool telemetry |
+| Metrics | **Prometheus-compatible path** | Operational metrics and alerting |
+| Dashboards | **Grafana-compatible path** | Repair/run/system observability |
+| Web console | **Next.js / React** | Operator control and repair visibility |
+| Containers | **Docker + Compose** | Reproducible local deployment |
+| CI/CD | **GitHub Actions** | Test, lint, security and benchmark gates |
+| Testing | **pytest + adversarial/security fixtures** | Unit, integration, policy and safety verification |
+| Evaluation | **Executable benchmark harness** | Resolution, regression, latency, cost and safety metrics |
+| Configuration | **Environment-based configuration** | Deploy-time secrets and runtime controls |
+
+The stack is deliberately modular: the agent should not become coupled to one model provider, observability vendor, sandbox implementation, queue, or deployment target.
+
+OpenTelemetry is used as the observability direction because it is vendor-neutral and supports correlated traces, metrics, and logs across distributed systems. citeturn0search1turn0search6
+
+For CI supply-chain security, GitHub recommends least-privilege workflow permissions and pinning third-party Actions to full commit SHAs; the repository follows that direction for its hardened workflow surface. citeturn0search0turn0search13
 
 ## Why it is different
 
@@ -83,9 +132,9 @@ Most coding agents optimize for generating a plausible patch. This project optim
                               └──→ evidence → retry
 ```
 
-Docker explicitly supports runtime CPU and memory constraints, while the container runtime also provides controls such as `no-new-privileges`; these are useful layers but are not claimed to be a complete VM boundary. citeturn0search4turn0search9
+Docker supports runtime CPU and memory constraints and other container security controls; these are treated as defence-in-depth layers, not as a claim that a normal container is equivalent to a hostile-code VM boundary.
 
-For public repositories, the project does **not** assume a persistent self-hosted GitHub Actions runner is safe for untrusted code. GitHub warns that self-hosted runners can be persistently compromised by untrusted workflows and recommends strong isolation/ephemeral execution patterns. citeturn0search0turn0search1
+For public repositories, the project does **not** assume a persistent self-hosted GitHub Actions runner is safe for untrusted code. GitHub documents the risks of untrusted workloads on self-hosted runners and recommends strong isolation/ephemeral execution patterns. citeturn0search0
 
 ## System architecture
 
@@ -103,6 +152,7 @@ For public repositories, the project does **not** assume a persistent self-hoste
 
 - provider-neutral LLM gateway
 - optional LiteLLM routing
+- optional local-model path
 - structured diagnosis and patch proposals
 - evidence-first prompts
 - bounded reflection
@@ -118,6 +168,7 @@ For public repositories, the project does **not** assume a persistent self-hoste
 - command/path policy
 - no secrets by default
 - scanner and verifier adapters
+- pluggable stronger isolation boundary
 
 ### Verification plane
 
@@ -139,11 +190,21 @@ For public repositories, the project does **not** assume a persistent self-hoste
 - approval gate for risky changes
 - no default-branch mutation
 
+### Observability plane
+
+- structured run events
+- trace/span model
+- metrics for latency, failures, iterations and resource use
+- model/tool cost metadata
+- OpenTelemetry export path
+- Langfuse-compatible LLM tracing path
+- Prometheus/Grafana-compatible operational monitoring
+
 ## Repository architecture
 
 ```text
 .
-├── v2/
+├── v2/                         # historical implementation workspace; current package is v0.3
 │   ├── app/
 │   │   ├── api.py              # HTTP control plane
 │   │   ├── audit.py            # append-only evidence events
@@ -152,28 +213,28 @@ For public repositories, the project does **not** assume a persistent self-hoste
 │   │   ├── config.py           # environment/config model
 │   │   ├── diff.py             # bounded unified-diff application
 │   │   ├── engine.py           # repair state machine
-│   │   ├── github.py           # GitHub issue/checkout/provenance
-│   │   ├── graph.py            # optional LangGraph orchestration boundary
-│   │   ├── llm.py              # provider-neutral model gateway
-│   │   ├── models.py            # typed domain state
-│   │   ├── persistence.py       # PostgreSQL-compatible repository
-│   │   ├── policy.py            # deterministic safety policy
-│   │   ├── pr.py                # verified PR publisher
-│   │   ├── queue.py             # Redis/in-process job queue
-│   │   ├── sandbox.py            # local + Docker execution
-│   │   ├── scanners.py           # security/dependency/SAST adapters
-│   │   ├── security.py           # secret/provenance helpers
-│   │   └── verify.py             # independent verification
-│   ├── evals/                   # executable benchmark harness + fixtures
-│   ├── tests/                   # unit/integration/security tests
-│   ├── docs/                    # architecture, threat model, operations
-│   ├── console/                 # operator web console
-│   ├── infra/                   # PostgreSQL, Redis, observability
+│   │   ├── github.py            # GitHub issue/checkout/provenance
+│   │   ├── graph.py             # orchestration boundary
+│   │   ├── llm.py               # provider-neutral model gateway
+│   │   ├── models.py             # typed domain state
+│   │   ├── persistence.py        # PostgreSQL-compatible repository
+│   │   ├── policy.py             # deterministic safety policy
+│   │   ├── pr.py                 # verified PR publisher
+│   │   ├── queue.py              # Redis/in-process job queue
+│   │   ├── sandbox.py             # local + Docker execution
+│   │   ├── scanners.py            # security/dependency/SAST adapters
+│   │   ├── security.py            # secret/provenance helpers
+│   │   └── verify.py               # independent verification
+│   ├── evals/                    # executable benchmark harness + fixtures
+│   ├── tests/                    # unit/integration/security tests
+│   ├── docs/                     # architecture, threat model, operations
+│   ├── console/                  # operator web console
+│   ├── infra/                    # PostgreSQL, Redis, observability
 │   ├── Dockerfile
 │   ├── docker-compose.yml
 │   ├── pyproject.toml
 │   └── STATUS.md
-├── .github/workflows/           # hardened CI/security workflows
+├── .github/workflows/            # hardened CI/security workflows
 ├── SECURITY.md
 └── LICENSE
 ```
@@ -213,8 +274,6 @@ The default policy is deliberately conservative:
 - require explicit approval for high-risk paths
 - preserve provenance before mutation
 - fail closed when a required gate cannot run
-
-GitHub also recommends least-privilege workflow permissions and immutable SHA pinning for third-party actions. The production CI surface therefore uses read-only defaults and should keep action references pinned. citeturn0search0
 
 ## Quickstart
 
@@ -264,7 +323,7 @@ The benchmark harness reports, from actual executions:
 - security gate outcomes
 - cost metadata when supplied by the model gateway
 
-No score is published as a claim until a raw report exists in `evals/reports/`.
+No score is published as a real-world claim until a raw report exists in `evals/reports/` and the benchmark definition is reproducible.
 
 ## Self-improvement loop
 
@@ -272,13 +331,13 @@ No score is published as a claim until a raw report exists in `evals/reports/`.
 Run → Observe → Classify failure → Preserve evidence
   → Compare strategy/model/tool choice
   → Evaluate on held-out cases
-  → Promote only if statistically/operationally better
+  → Promote only if operationally better
   → Deploy → Observe again
 ```
 
 The agent is therefore designed to improve from **measured repair outcomes**, not from unverified self-generated conclusions.
 
-## Roadmap / completeness ledger
+## Implementation status
 
 ### Built in the repository
 
@@ -306,27 +365,30 @@ The agent is therefore designed to improve from **measured repair outcomes**, no
 - [x] CI/security workflow surfaces
 - [x] architecture/threat/operations documentation
 
-### Requires environment credentials or infrastructure to become operational
+### Operational dependencies
+
+These are intentionally listed separately because code cannot substitute for live infrastructure:
 
 - [ ] real GitHub token/App credentials
 - [ ] production PostgreSQL
 - [ ] production Redis
 - [ ] Docker daemon or stronger sandbox provider
 - [ ] LLM provider credentials / local model
-- [ ] deployed Langfuse/OpenTelemetry collector
+- [ ] deployed OpenTelemetry collector / Langfuse backend
 - [ ] installed Gitleaks/Semgrep/Trivy/CodeQL binaries where those adapters are enabled
 - [ ] human reviewer identity/approval integration
 
-### Next hardening tier
+### Production hardening roadmap
 
-- [ ] production microVM backend (Firecracker/Kata/gVisor class)
-- [ ] GitHub App + webhook ingestion
-- [ ] 100+ benchmark cases with public raw evidence
-- [ ] adversarial prompt-injection/repository-escape suite
-- [ ] learned routing/strategy promotion with held-out evaluation
+- [ ] microVM-grade execution backend for high-risk hostile workloads
+- [ ] full GitHub App + webhook → queue → repair → PR lifecycle
+- [ ] 100+ benchmark cases with reproducible raw evidence
+- [ ] adversarial prompt-injection and repository-escape campaign
+- [ ] learned model/strategy routing with held-out evaluation
 - [ ] multi-tenant hosted control plane
+- [ ] artifact attestations / stronger software supply-chain provenance
 
-These are infrastructure/deployment milestones rather than missing core architecture. They must remain visible instead of being silently treated as complete.
+This section is the **implementation status**, not a claim that every deployment dependency is already live. The rule is simple: code is marked built when it exists and is tested; operational capabilities are marked live only after the required environment and acceptance tests exist.
 
 ## Product path
 
@@ -336,7 +398,7 @@ The moat is the combination of **repair traces + benchmark corpus + policy engin
 
 ## Security
 
-Read `SECURITY.md` and `v2/docs/THREAT_MODEL.md` before enabling autonomous PR publication. For public repositories, prefer ephemeral hosted or stronger isolated execution rather than persistent self-hosted runners; GitHub explicitly warns about the risk of untrusted code on self-hosted runners. citeturn0search0turn0search1
+Read `SECURITY.md` and `v2/docs/THREAT_MODEL.md` before enabling autonomous PR publication. For public repositories, prefer ephemeral hosted or stronger isolated execution rather than persistent self-hosted runners; GitHub explicitly warns about the risk of untrusted code on self-hosted runners. citeturn0search0
 
 ## License
 
