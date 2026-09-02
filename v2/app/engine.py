@@ -13,7 +13,6 @@ from .policy import validate_patch
 from .sandbox import DockerSandbox, LocalSandbox
 from .scanners import run_security_suite
 from .verify import Verifier
-from .llm import LLM
 
 
 class RepairEngine:
@@ -37,7 +36,6 @@ class RepairEngine:
                 state.provenance = self.github.checkout(issue.repository, state.workspace / "repo", issue.head_sha or issue.base_branch)
                 repo = state.workspace / "repo"
                 self._event(state, "checkout_completed", {"sha": state.provenance.resolved_sha})
-
                 command = reproduction_cmd or ["python", "-m", "pytest", "-q"]
                 state.status = RunStatus.REPRODUCING
                 state.reproduction = self._reproduce(repo, command)
@@ -46,12 +44,10 @@ class RepairEngine:
                     return self._fail(state, "baseline did not reproduce a failure")
                 if not self.llm:
                     return self._fail(state, "LLM not configured")
-
                 context = self._repository_context(repo)
                 state.status = RunStatus.DIAGNOSING
                 state.diagnosis = self.llm.diagnose(issue.title + "\n" + issue.body, self._evidence_text(state), context)
                 self._event(state, "diagnosis", state.diagnosis.model_dump(mode="json"))
-
                 for iteration in range(1, state.budget.max_iterations + 1):
                     state.iteration = iteration
                     state.status = RunStatus.PATCHING
@@ -62,17 +58,16 @@ class RepairEngine:
                         return self._fail(state, "policy gate failed: " + "; ".join(errors))
                     state.status = RunStatus.GATING
                     state.patch.diff = unified_diff(repo, state.patch.files)
+                    apply_proposal(repo, state.patch, state.budget)
                     state.gates = run_security_suite(repo)
                     self._event(state, "security_gates", [g.model_dump(mode="json") for g in state.gates])
                     required_failures = [g for g in state.gates if g.required and not g.passed]
                     if required_failures:
                         return self._fail(state, "security gate failed")
-                    if state.patch.risk in {RiskLevel.HIGH, RiskLevel.CRITICAL} and self.settings.approval_required_for_high_risk:
+                    if state.patch.risk in {RiskLevel.HIGH, RiskLevel.CRITICAL} and self.settings.approval_required_for_high_risk and not state.approval.approved:
                         state.status = RunStatus.AWAITING_APPROVAL
                         state.approval.required = True
-                        return self._fail(state, "human approval required before high-risk patch")
-
-                    apply_proposal(repo, state.patch, state.budget)
+                        return self._finish(state)
                     state.status = RunStatus.VERIFYING
                     state.verification = Verifier(self.sandbox).run(repo, [command, ["python", "-m", "compileall", "-q", "."]])
                     self._event(state, "verification", state.verification.model_dump(mode="json"))
@@ -120,8 +115,7 @@ class RepairEngine:
     def _evidence_text(self, state: RepairState) -> str:
         parts = []
         if state.reproduction and state.reproduction.result:
-            parts.append(state.reproduction.result.stdout)
-            parts.append(state.reproduction.result.stderr)
+            parts.extend([state.reproduction.result.stdout, state.reproduction.result.stderr])
         if state.verification:
             for result in state.verification.results:
                 parts.extend([result.stdout, result.stderr])
