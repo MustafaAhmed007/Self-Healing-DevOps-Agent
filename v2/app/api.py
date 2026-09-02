@@ -6,8 +6,10 @@ from .config import Settings
 from .engine import RepairEngine
 from .models import Issue, RepairState
 from .persistence import MemoryRepository
+from .webhooks import router as webhook_router
 
 app = FastAPI(title="Self-Healing DevOps Agent", version="0.3.0", description="Bounded evidence-driven autonomous software repair")
+app.include_router(webhook_router)
 settings = Settings.from_env()
 repository = MemoryRepository()
 
