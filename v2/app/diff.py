@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import difflib
 from pathlib import Path
-
 from .models import Budget, PatchProposal
 from .policy import validate_patch
 
@@ -20,10 +19,11 @@ def apply_proposal(root: Path, proposal: PatchProposal, budget: Budget) -> str:
     errors = validate_patch(proposal, budget)
     if errors:
         raise PermissionError("; ".join(errors))
+    diff = unified_diff(root, proposal.files)
     for name, content in proposal.files.items():
         target = (root / name).resolve()
         if root.resolve() not in target.parents:
             raise PermissionError(f"patch escapes workspace: {name}")
         target.parent.mkdir(parents=True, exist_ok=True)
         target.write_text(content)
-    return unified_diff(root, proposal.files)
+    return diff
