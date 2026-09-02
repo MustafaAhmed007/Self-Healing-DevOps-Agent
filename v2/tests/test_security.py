@@ -1,5 +1,5 @@
 from pathlib import Path
-from v2.app.security import scan_text, scan_workspace
+from app.security import scan_text, scan_workspace
 
 
 def test_private_key_detected():
