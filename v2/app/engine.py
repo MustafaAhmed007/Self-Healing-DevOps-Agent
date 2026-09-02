@@ -44,9 +44,8 @@ class RepairEngine:
                     return self._fail(state, "baseline did not reproduce a failure")
                 if not self.llm:
                     return self._fail(state, "LLM not configured")
-                context = self._repository_context(repo)
                 state.status = RunStatus.DIAGNOSING
-                state.diagnosis = self.llm.diagnose(issue.title + "\n" + issue.body, self._evidence_text(state), context)
+                state.diagnosis = self.llm.diagnose(issue.title + "\n" + issue.body, self._evidence_text(state), self._repository_context(repo))
                 self._event(state, "diagnosis", state.diagnosis.model_dump(mode="json"))
                 for iteration in range(1, state.budget.max_iterations + 1):
                     state.iteration = iteration
@@ -58,16 +57,16 @@ class RepairEngine:
                         return self._fail(state, "policy gate failed: " + "; ".join(errors))
                     state.status = RunStatus.GATING
                     state.patch.diff = unified_diff(repo, state.patch.files)
+                    if state.patch.risk in {RiskLevel.HIGH, RiskLevel.CRITICAL} and self.settings.approval_required_for_high_risk and not state.approval.approved:
+                        state.approval.required = True
+                        state.status = RunStatus.AWAITING_APPROVAL
+                        self._event(state, "approval_required", {"risk": state.patch.risk.value})
+                        return self._finish(state)
                     apply_proposal(repo, state.patch, state.budget)
                     state.gates = run_security_suite(repo)
                     self._event(state, "security_gates", [g.model_dump(mode="json") for g in state.gates])
-                    required_failures = [g for g in state.gates if g.required and not g.passed]
-                    if required_failures:
+                    if any(g.required and not g.passed for g in state.gates):
                         return self._fail(state, "security gate failed")
-                    if state.patch.risk in {RiskLevel.HIGH, RiskLevel.CRITICAL} and self.settings.approval_required_for_high_risk and not state.approval.approved:
-                        state.status = RunStatus.AWAITING_APPROVAL
-                        state.approval.required = True
-                        return self._finish(state)
                     state.status = RunStatus.VERIFYING
                     state.verification = Verifier(self.sandbox).run(repo, [command, ["python", "-m", "compileall", "-q", "."]])
                     self._event(state, "verification", state.verification.model_dump(mode="json"))
@@ -96,11 +95,7 @@ class RepairEngine:
         return Reproduction(reproduced=result.exit_code != 0 and not result.timed_out, result=result, failure_signature=signature, baseline_passed=result.exit_code == 0)
 
     def _repository_context(self, repo: Path) -> str:
-        files = []
-        for path in sorted(repo.rglob("*")):
-            if path.is_file() and ".git" not in path.parts and len(files) < 150:
-                files.append(str(path.relative_to(repo)))
-        return "\n".join(files)
+        return "\n".join(str(p.relative_to(repo)) for p in sorted(repo.rglob("*")) if p.is_file() and ".git" not in p.parts)[:12000]
 
     def _context_files(self, repo: Path, preferred: list[str]) -> dict[str, str]:
         candidates = preferred or [str(p.relative_to(repo)) for p in sorted(repo.rglob("*.py"))[:12]]
@@ -117,14 +112,12 @@ class RepairEngine:
         if state.reproduction and state.reproduction.result:
             parts.extend([state.reproduction.result.stdout, state.reproduction.result.stderr])
         if state.verification:
-            for result in state.verification.results:
-                parts.extend([result.stdout, result.stderr])
+            for result in state.verification.results: parts.extend([result.stdout, result.stderr])
         return "\n".join(parts)[-20000:]
 
     def _verification_failure(self, state: RepairState) -> str:
         if not state.verification: return "no verification result"
-        failed = [r for r in state.verification.results if r.exit_code != 0]
-        return "\n".join((r.stderr or r.stdout) for r in failed)[-4000:]
+        return "\n".join((r.stderr or r.stdout) for r in state.verification.results if r.exit_code != 0)[-4000:]
 
     def _pr_body(self, state: RepairState) -> str:
         return f"Automated repair run `{state.run_id}`.\n\nIssue: #{state.issue.number}\nRevision: `{state.provenance.resolved_sha if state.provenance else 'unknown'}`\n\nRoot cause: {state.diagnosis.root_cause if state.diagnosis else 'unknown'}\n\nVerification: `{state.verification.passed if state.verification else False}`\n"
