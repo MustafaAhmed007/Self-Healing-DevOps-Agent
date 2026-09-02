@@ -1,0 +1,13 @@
+{
+  "id": "bug_003",
+  "language": "python",
+  "description": "Case-sensitive command normalization bug.",
+  "test_command": ["python", "-m", "pytest", "-q"],
+  "files": {
+    "app.py": "def normalize(value):\n    return value.strip()\n",
+    "test_app.py": "from app import normalize\n\ndef test_normalize():\n    assert normalize('  HELLO  ') == 'hello'\n"
+  },
+  "expected_fix": {
+    "app.py": "def normalize(value):\n    return value.strip().lower()\n"
+  }
+}
