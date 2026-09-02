@@ -1,52 +1,63 @@
 # Build Ledger
 
-## v0.1 foundation
-- Architecture and mission README
-- Security principles and repository map
-- Initial API/web/infrastructure/evaluation foundations
+This is the canonical implementation ledger. **Built** means code/configuration plus a meaningful test or usage path exists. **Operational** means the external provider/infrastructure has been configured and a live acceptance test has passed.
 
-## v0.2 built
-- Pydantic repair state, issue, diagnosis, patch and verification models
-- Explicit iteration/runtime/cost/patch/command budgets
-- GitHub issue API and repository checkout
-- Local executor and Docker sandbox implementation
-- Network-disabled Docker execution, dropped capabilities, non-root user, no-new-privileges, resource limits
-- Deterministic path/command policy gate
-- Optional LiteLLM diagnosis and patch generation
-- Independent verification runner
-- Issue-to-verify engine
-- Verified branch/PR publisher
-- FastAPI endpoint and CLI
-- LangGraph graph boundary with bounded reflection route
-- Portable checkpoint store
-- Benchmark case schema and honest harness
-- Unit tests
-- Docker/Compose/requirements/env/CI
-- V2 security contract
+## v0.1 — foundation
 
-## Still required
-### V2 completion
-- Durable PostgreSQL persistence
-- Redis-backed worker execution
-- Full LangGraph checkpointer integration
-- Real trace emission to Langfuse/OpenTelemetry
-- Immutable commit checkout and provenance capture
-- Patch/diff application rather than whole-file replacement only
-- Real secret/static/dependency scanner adapters
-- Human approval workflow for risky changes
-- Robust reflection loop driven by failed-test evidence
-- End-to-end PR test with a disposable fixture repository
-- Actual benchmark execution and stored raw reports
+- [x] Mission, architecture and safety model
+- [x] Initial API/CLI/infrastructure/evaluation structure
 
-### V3
-- Next.js live console
-- GitHub App/webhooks
-- multi-language environment adapters
-- stronger microVM sandbox provider
-- benchmark expansion to 100+ cases
-- adversarial security suite
-- learned model routing and strategy promotion
-- hosted multi-tenant control plane
+## v0.2 — vertical slice
+
+- [x] Typed repair state and bounded budgets
+- [x] GitHub issue acquisition and repository checkout
+- [x] Local + Docker execution adapters
+- [x] Network/resource/capability restrictions
+- [x] Deterministic command/path policy
+- [x] LLM gateway boundary
+- [x] Diagnosis/patch/verification flow
+- [x] PR publisher
+- [x] Checkpoint/evidence foundation
+
+## v0.3 — complete reference implementation surfaces
+
+- [x] Provenance capture and resolved revision metadata
+- [x] Bounded file patch application + unified diff generation
+- [x] Secret scanner + Gitleaks/Semgrep/Trivy adapters
+- [x] Baseline reproduction and independent verification
+- [x] Bounded reflection loop driven by observed failures
+- [x] PostgreSQL persistence adapter
+- [x] Redis queue adapter
+- [x] LangGraph checkpoint-capable orchestration boundary
+- [x] Append-only evidence ledger + hashed manifests
+- [x] Human approval state model/API
+- [x] Secure Git push authentication without token in argv/remotes
+- [x] FastAPI lifecycle endpoints
+- [x] CLI
+- [x] Executable benchmark fixtures and raw report writer
+- [x] Operator console
+- [x] Docker Compose local stack
+- [x] CI + dependency audit workflow
+- [x] Architecture/threat/operations documentation surfaces
+
+## Operational acceptance still required
+
+These cannot honestly be marked operational until their external dependencies are configured and evidence is retained:
+
+- [ ] Real GitHub App/token + disposable-repository PR acceptance test
+- [ ] Docker sandbox acceptance on a hardened host
+- [ ] PostgreSQL persistence/recovery under process restart
+- [ ] Redis queue/worker restart semantics
+- [ ] LLM provider/local model repair measurements
+- [ ] OpenTelemetry/Langfuse live traces
+- [ ] Gitleaks/Semgrep/Trivy installed and exercised against fixtures
+- [ ] High-risk approval + persistent resume workflow
+- [ ] 100+ case benchmark with retained raw results
+- [ ] Stronger microVM sandbox backend
+- [ ] GitHub App/webhook ingestion
+- [ ] Adversarial prompt-injection/repository-escape suite
+- [ ] Multi-tenant isolation/load testing
 
 ## Evidence rule
-A feature is marked built only when code and tests exist. A benchmark metric is marked measured only when the benchmark has actually run and its evidence is retained.
+
+Never label an unexecuted benchmark metric as measured. Never label an external integration operational until a live acceptance test produces retained evidence.
