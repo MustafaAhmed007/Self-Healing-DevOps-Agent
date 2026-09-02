@@ -1,6 +1,7 @@
-from v2.app.models import Issue, RepairState, RunStatus
+from app.models import Issue, RepairState, RunStatus
+
 
 def test_state_is_bounded_and_typed():
-    s=RepairState(issue=Issue(repository="o/r",number=1))
-    assert s.status is RunStatus.CREATED
-    assert s.budget.max_iterations==3
+    state = RepairState(issue=Issue(repository="o/r", number=1))
+    assert state.status is RunStatus.CREATED
+    assert state.budget.max_iterations == 3
