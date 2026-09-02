@@ -2,6 +2,8 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
+import shutil
 import subprocess
 import tempfile
 import time
@@ -10,7 +12,8 @@ from pathlib import Path
 
 def execute(command: list[str], cwd: Path) -> tuple[int, str, str, int]:
     started = time.monotonic()
-    p = subprocess.run(command, cwd=cwd, capture_output=True, text=True, timeout=120)
+    env = {**os.environ, "PYTHONDONTWRITEBYTECODE": "1"}
+    p = subprocess.run(command, cwd=cwd, capture_output=True, text=True, timeout=120, env=env, check=False)
     return p.returncode, p.stdout[-20000:], p.stderr[-20000:], int((time.monotonic() - started) * 1000)
 
 
@@ -25,6 +28,8 @@ def run(cases_dir: Path, output: Path) -> dict:
                 target.parent.mkdir(parents=True, exist_ok=True)
                 target.write_text(content)
             base = execute(case.get("test_command", ["python", "-m", "pytest", "-q"]), root)
+            for cache in root.rglob("__pycache__"):
+                shutil.rmtree(cache, ignore_errors=True)
             for name, content in case["expected_fix"].items():
                 target = root / name
                 target.parent.mkdir(parents=True, exist_ok=True)
