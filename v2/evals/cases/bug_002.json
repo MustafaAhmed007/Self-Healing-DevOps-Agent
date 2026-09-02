@@ -1,0 +1,13 @@
+{
+  "id": "bug_002",
+  "language": "python",
+  "description": "Incorrect inclusive slice in chunking helper.",
+  "test_command": ["python", "-m", "pytest", "-q"],
+  "files": {
+    "app.py": "def first_two(values):\n    return values[:1]\n",
+    "test_app.py": "from app import first_two\n\ndef test_first_two():\n    assert first_two([10, 20, 30]) == [10, 20]\n"
+  },
+  "expected_fix": {
+    "app.py": "def first_two(values):\n    return values[:2]\n"
+  }
+}
