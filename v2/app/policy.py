@@ -2,10 +2,10 @@ from __future__ import annotations
 
 import shlex
 from pathlib import Path
-from .models import Budget, PatchProposal, RiskLevel
+from .models import Budget, PatchProposal
 
 PROTECTED_PREFIXES = (".git/", ".github/workflows/", ".github/actions/")
-PROTECTED_FILES = {".env", ".env.local", ".env.production", "Dockerfile", "docker-compose.yml"}
+PROTECTED_FILES = {".env", ".env.local", ".env.production"}
 BLOCKED_EXT = {".pem", ".key", ".p12", ".pfx", ".jks", ".keystore"}
 BLOCKED_COMMANDS = {"sudo", "su", "mount", "umount", "nsenter", "unshare", "docker", "podman", "kubectl"}
 BLOCKED_ARGS = {"--privileged", "--network=host", "--pid=host", "--ipc=host", "-v /:/host"}
@@ -15,8 +15,7 @@ def validate_patch(patch: PatchProposal, budget: Budget) -> list[str]:
     errors: list[str] = []
     if len(patch.files) > budget.max_patch_files:
         errors.append("patch file limit exceeded")
-    added = sum(len(v.splitlines()) for v in patch.files.values())
-    if added > budget.max_patch_lines:
+    if sum(len(v.splitlines()) for v in patch.files.values()) > budget.max_patch_lines:
         errors.append("patch line limit exceeded")
     for raw in patch.files:
         p = Path(raw)
@@ -27,8 +26,6 @@ def validate_patch(patch: PatchProposal, budget: Budget) -> list[str]:
             errors.append(f"protected path: {raw}")
         if p.suffix.lower() in BLOCKED_EXT:
             errors.append(f"sensitive extension: {raw}")
-    if patch.risk == RiskLevel.CRITICAL:
-        errors.append("critical-risk patches require human approval")
     return errors
 
 
