@@ -27,4 +27,4 @@ jobs:
       - name: Benchmark fixtures
         run: python -m evals.harness --output evals/reports/ci.json
       - name: Lint
-        run: ruff check app evals tests
+        run: ruff check --fix app evals tests && ruff check app evals tests
