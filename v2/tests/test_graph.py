@@ -1,4 +1,4 @@
-from v2.app.graph import build_graph
+from app.graph import build_graph
 
 
 def test_graph_is_optional_but_bounded():
@@ -6,7 +6,7 @@ def test_graph_is_optional_but_bounded():
     if graph is None:
         return
     result = graph.invoke({"iteration": 0, "passed": True})
-    assert result["stage"] == "verify" or result.get("stage") is not None
+    assert result.get("stage") == "verify"
 
 
 def test_graph_fallback_contract():
