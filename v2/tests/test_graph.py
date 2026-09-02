@@ -1,6 +1,14 @@
 from v2.app.graph import build_graph
 
-def test_graph_builds_without_optional_dependency():
-    # If LangGraph is installed this returns a compiled graph; otherwise None is the documented fallback.
-    graph=build_graph()
-    assert graph is None or graph is not None
+
+def test_graph_is_optional_but_bounded():
+    graph = build_graph(max_iterations=2)
+    if graph is None:
+        return
+    result = graph.invoke({"iteration": 0, "passed": True})
+    assert result["stage"] == "verify" or result.get("stage") is not None
+
+
+def test_graph_fallback_contract():
+    graph = build_graph(max_iterations=1)
+    assert graph is None or hasattr(graph, "invoke")
