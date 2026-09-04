@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import os
 import tempfile
 import time
 from pathlib import Path
@@ -10,6 +11,7 @@ from .github import GitHubClient
 from .models import Issue, RepairState, Reproduction, RunStatus, RiskLevel
 from .persistence import MemoryRepository
 from .policy import validate_patch
+from .research import MultiAspectResearch
 from .sandbox import DockerSandbox, LocalSandbox
 from .scanners import run_security_suite
 from .verify import Verifier
@@ -23,6 +25,7 @@ class RepairEngine:
         self.llm = llm
         self.repository = repository or MemoryRepository()
         self.evidence = evidence or EvidenceLedger(Path(self.settings.evidence_dir))
+        self.research = MultiAspectResearch(self.settings.research_url, self.settings.research_timeout, self.settings.research_max_chars)
 
     def start(self, issue: Issue, reproduction_cmd: list[str] | None = None, publish: bool = False) -> RepairState:
         state = RepairState(issue=issue)
@@ -44,14 +47,18 @@ class RepairEngine:
                     return self._fail(state, "baseline did not reproduce a failure")
                 if not self.llm:
                     return self._fail(state, "LLM not configured")
+                research_urls = [u.strip() for u in os.getenv("SHDA_RESEARCH_URLS", "").split(",") if u.strip()]
+                research = self.research.gather(issue.title + "\n" + issue.body, repo, research_urls)
+                research_context = self.research.context(research)
+                self._event(state, "research", {"sources": len(research), "providers": sorted({r.source for r in research})})
                 state.status = RunStatus.DIAGNOSING
-                state.diagnosis = self.llm.diagnose(issue.title + "\n" + issue.body, self._evidence_text(state), self._repository_context(repo))
+                state.diagnosis = self.llm.diagnose(issue.title + "\n" + issue.body, self._evidence_text(state) + "\nRESEARCH:\n" + research_context, self._repository_context(repo))
                 self._event(state, "diagnosis", state.diagnosis.model_dump(mode="json"))
                 for iteration in range(1, state.budget.max_iterations + 1):
                     state.iteration = iteration
                     state.status = RunStatus.PATCHING
                     files = self._context_files(repo, state.diagnosis.affected_files)
-                    state.patch = self.llm.propose(state.diagnosis, files, self._evidence_text(state))
+                    state.patch = self.llm.propose(state.diagnosis, files, self._evidence_text(state) + "\nRESEARCH:\n" + research_context)
                     errors = validate_patch(state.patch, state.budget)
                     if errors:
                         return self._fail(state, "policy gate failed: " + "; ".join(errors))
@@ -81,7 +88,7 @@ class RepairEngine:
                     state.history.append({"stage": "reflection", "iteration": iteration, "failure": self._verification_failure(state)})
                     if iteration < state.budget.max_iterations:
                         state.status = RunStatus.DIAGNOSING
-                        state.diagnosis = self.llm.diagnose(issue.title + "\n" + issue.body, self._evidence_text(state), self._repository_context(repo))
+                        state.diagnosis = self.llm.diagnose(issue.title + "\n" + issue.body, self._evidence_text(state) + "\nRESEARCH:\n" + research_context, self._repository_context(repo))
                 return self._fail(state, "iteration budget exhausted")
             except Exception as exc:
                 return self._fail(state, f"unexpected failure: {type(exc).__name__}: {exc}")
