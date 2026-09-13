@@ -1,26 +1,44 @@
+[build-system]
+requires = ["setuptools>=75", "wheel"]
+build-backend = "setuptools.build_meta"
+
 [project]
 name = "self-healing-devops-agent"
-version = "0.1.0"
-description = "Sandboxed, evidence-driven autonomous software repair for GitHub issues"
+version = "0.3.0"
+description = "Sandboxed AI coding agent for autonomous software repair with evidence-backed verification"
 readme = "README.md"
 requires-python = ">=3.11"
 dependencies = [
-  "fastapi>=0.115,<1",
-  "uvicorn[standard]>=0.30,<1",
-  "pydantic>=2.8,<3",
-  "pydantic-settings>=2.4,<3",
-  "httpx>=0.27,<1",
-  "typer>=0.12,<1",
-  "rich>=13.7,<15",
+  "pydantic>=2.7",
+  "fastapi>=0.115",
+  "uvicorn>=0.30",
+  "httpx>=0.27",
 ]
 
 [project.optional-dependencies]
-dev = ["pytest>=8,<9", "pytest-asyncio>=0.24,<1", "ruff>=0.6,<1", "mypy>=1.11,<2"]
-llm = ["litellm>=1.45,<2", "langgraph>=0.2,<1"]
-observability = ["langfuse>=2.50,<4", "opentelemetry-api>=1.27,<2"]
+dev = ["pytest>=8", "ruff>=0.6", "mypy>=1.10"]
+ai = ["litellm>=1.50", "langgraph>=0.2"]
+postgres = ["psycopg[binary]>=3.2"]
+redis = ["redis>=5.0"]
+observability = ["opentelemetry-api>=1.27", "opentelemetry-sdk>=1.27"]
+all = ["litellm>=1.50", "langgraph>=0.2", "psycopg[binary]>=3.2", "redis>=5.0", "opentelemetry-api>=1.27", "opentelemetry-sdk>=1.27"]
+
+[project.scripts]
+shda = "app.cli:main"
+shda-install = "install:main"
+
+[tool.setuptools]
+package-dir = {"" = "v2"}
+py-modules = ["install"]
+
+[tool.setuptools.packages.find]
+where = ["v2"]
+include = ["app*", "evals*"]
+exclude = ["console*"]
 
 [tool.pytest.ini_options]
-testpaths = ["tests"]
+testpaths = ["v2/tests"]
+pythonpath = ["v2"]
 addopts = "-q"
 
 [tool.ruff]
@@ -28,7 +46,7 @@ line-length = 100
 target-version = "py311"
 
 [tool.ruff.lint]
-select = ["E", "F", "I", "B", "UP"]
+ignore = ["BLE001", "PLW1510", "S110"]
 
 [tool.mypy]
 python_version = "3.11"
