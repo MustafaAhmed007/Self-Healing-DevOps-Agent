@@ -6,41 +6,33 @@
 
 **GitHub issue → immutable checkout → reproduce → research → diagnose → bounded patch → policy → security → verify → evidence → PR**
 
-This is an engineering reference architecture for **self-healing DevOps, autonomous software repair, AI coding agents, AIOps/DevSecOps automation, and repository-aware debugging**. It is designed around one rule: **model confidence is not proof**. Every repair must be constrained, reproducible, independently verified, and reviewable.
+This is an engineering reference architecture for **self-healing DevOps, autonomous software repair, AI coding agents, AIOps/DevSecOps automation, and repository-aware debugging**. Model confidence is never treated as proof: repairs are constrained, reproducible, independently verified, and reviewable.
 
-## Try it without a week of setup
+## Install and verify
 
-The repository now has a **one-command installation and verification path**. It creates the virtual environment, installs the development dependencies, runs the test suite, and leaves the project ready to use.
+The repository has a one-command setup path that creates the virtual environment, installs dependencies, runs the test suite, and only then reports success.
+
+**Windows — double-click friendly**
+
+```bat
+install.bat
+```
 
 **Windows PowerShell**
 
 ```powershell
-./install.ps1
+powershell -ExecutionPolicy Bypass -File .\install.ps1
 ```
 
 **Linux / macOS**
 
 ```bash
-./install.sh
+bash install.sh
 ```
 
-Or from `v2/`:
+The installers require Python 3.11+. They intentionally do not pretend that external infrastructure such as Docker, PostgreSQL, Redis, GitHub credentials, or an LLM can be provisioned without its own environment requirements.
 
-```bash
-python install.py
-```
-
-After installation:
-
-```bash
-cd v2
-.venv/bin/python -m app.cli demo       # Linux/macOS
-# .venv/Scripts/python.exe -m app.cli demo  # Windows
-```
-
-The installer removes the repeated dependency/debugging work that commonly makes AI-agent repositories painful to evaluate. It does not pretend that external infrastructure such as GitHub credentials, an LLM, Docker, PostgreSQL, or Redis can be installed without their own system requirements.
-
-## 60-second local path
+For a normal development install:
 
 ```bash
 cd v2
@@ -51,42 +43,39 @@ pytest -q
 python -m app.cli demo
 ```
 
-Complete local stack:
-
-```bash
-cd v2
-docker compose up --build
-```
+The root `pyproject.toml` now targets the same authoritative `v2` runtime, so `pip install -e '.[dev]'` from the repository root is also supported.
 
 ## Multi-aspect auto-research
 
-Repair should not depend on a single search vendor. SHDA now has an **evidence-first multi-aspect research layer** with three paths:
+Repair can gather evidence through independent paths rather than depending on one search vendor:
 
 ```text
-                  Research question
-                         │
-             ┌───────────┼───────────┐
-             ▼           ▼           ▼
-        Optional      Direct URL   Local repo
-        cloud search   retrieval    evidence
-             │           │           │
-             └───────────┼───────────┘
-                         ▼
-                 Deduplicated evidence
-                         ▼
-                Diagnosis / verification
+                    Research question
+                           │
+             ┌─────────────┼─────────────┐
+             ▼             ▼             ▼
+       Optional cloud   Direct URLs   Local repository
+          endpoint       retrieval       evidence
+             │             │             │
+             └─────────────┼─────────────┘
+                           ▼
+                    Deduplicated context
+                           ▼
+                   Evidence-driven diagnosis
 ```
 
-- **Optional cloud search:** set `SHDA_RESEARCH_URL` to a compatible JSON research endpoint. Cloud search is an accelerator, not a hard dependency.
-- **Direct URL fallback:** pass one or more URLs to the research CLI when you already know the authoritative source.
-- **Local/direct repository fallback:** relevant repository documentation and source files are searched locally, so research remains useful without a cloud search service.
-- **Multiple aspects:** problem, implementation, verification, and security are the default research dimensions.
-- **Evidence boundary:** research is context, not authority. The repair policy, sandbox, security gates, and independent verifier remain authoritative.
+- **Optional cloud search:** configure `SHDA_RESEARCH_URL` with a compatible JSON endpoint.
+- **Direct URL fallback:** use `--url` for authoritative public documentation or references.
+- **Local fallback:** repository source and documentation are searched locally when external research is unavailable.
+- **Multiple aspects:** problem, implementation, verification, and security are the default dimensions.
+- **Security boundary:** direct URL retrieval rejects malformed, credential-bearing, localhost, private, loopback, link-local, reserved, multicast, and unspecified destinations. Research is context—not an authority that can bypass policy or verification.
 
 Example:
 
 ```bash
-python -m app.cli research "How should this failure be fixed safely?" \
+cd v2
+python -m app.cli research \
+  "How should this failure be fixed safely?" \
   --repo . \
   --aspect problem \
   --aspect implementation \
@@ -95,111 +84,124 @@ python -m app.cli research "How should this failure be fixed safely?" \
   --url https://docs.python.org/3/
 ```
 
-During an actual repair, configure direct sources with `SHDA_RESEARCH_URLS` (comma-separated) and optionally `SHDA_RESEARCH_URL`; the engine automatically gathers research before diagnosis and records a research event in the run evidence.
+During repair, direct sources can be supplied with `SHDA_RESEARCH_URLS` (comma-separated). The repair engine gathers research before diagnosis and records a research event in the evidence ledger.
 
-## What it actually builds
+## Runnable examples
 
-Most coding agents optimize for generating a plausible patch. This system optimizes for a **verifiable repair transaction**:
+```bash
+# deterministic health/demo
+cd v2
+python -m app.cli demo
 
-1. Acquire an issue and exact repository revision.
-2. Reproduce the failure before mutation.
-3. Gather multi-aspect evidence when available.
-4. Diagnose from failure evidence, repository context, and research.
-5. Generate a bounded patch rather than unrestricted workspace changes.
-6. Apply deterministic policy and security gates.
-7. Verify the change independently and check regressions.
-8. Reflect only within a hard iteration budget.
-9. Preserve an evidence/audit manifest.
-10. Publish a reviewable PR only when policy permits.
+# local evidence research
+python -m app.cli research "Python dependency failure" --repo .
+
+# executable benchmark fixtures
+python -m evals.harness --output evals/reports/latest.json
+
+# repair workflow
+python -m app.cli repair OWNER/REPO ISSUE_NUMBER --repro python -m pytest -q
+
+# API
+uvicorn app.api:app --reload
+```
+
+Complete local infrastructure:
+
+```bash
+cd v2
+docker compose up --build
+```
 
 ## System architecture
 
 ```text
                          CONTROL PLANE
-          API / CLI / jobs / approvals / persistence
+             API / CLI / jobs / approvals / evidence
                               │
                               ▼
- ISSUE ──► CONTEXT ──► IMMUTABLE CHECKOUT ──► RESEARCH
-                              │                    │
-                              └──────────┬─────────┘
-                                         ▼
-                               INTELLIGENCE PLANE
-                         LLM gateway / diagnosis / patch
-                                         │
-                                         ▼
-                               EXECUTION + POLICY
-                         sandbox / commands / diff limits
-                                         │
-                              ┌──────────┴──────────┐
-                              ▼                     ▼
-                         SECURITY GATES        VERIFICATION
-                              │                     │
-                              └──────────┬──────────┘
-                                         ▼
-                                  EVIDENCE + AUDIT
-                                         │
-                                         ▼
-                                REVIEWABLE PR / STOP
+ Issue → immutable checkout → baseline reproduction
+                              │
+                              ▼
+                       MULTI-ASPECT RESEARCH
+                  cloud? → URLs → local repository
+                              │
+                              ▼
+                     INTELLIGENCE PLANE
+                  diagnosis → bounded patch
+                              │
+                              ▼
+                      EXECUTION + POLICY
+             sandbox / resource limits / diff gates
+                              │
+                 ┌────────────┴────────────┐
+                 ▼                         ▼
+          SECURITY GATES             VERIFICATION
+                 │                         │
+                 └────────────┬────────────┘
+                              ▼
+                       EVIDENCE + AUDIT
+                              │
+                              ▼
+                    REVIEWABLE PR / STOP
 ```
 
 ### Control plane
-FastAPI, CLI, job lifecycle, approvals, PostgreSQL/Redis integration surfaces, checkpoints, and evidence storage.
+FastAPI, CLI, lifecycle, approvals, checkpoints, evidence, PostgreSQL and Redis integration surfaces.
 
 ### Intelligence plane
 Provider-neutral LLM gateway, optional LiteLLM/LangGraph integration, local-model path, evidence-first diagnosis, bounded reflection, and research context.
 
 ### Execution plane
-Immutable Git checkout, local/Docker execution, resource/network controls, deterministic command/path policy, bounded diffs, and pluggable stronger isolation.
+Immutable Git checkout, local/Docker sandbox, resource/network/capability controls, deterministic command/path policy, bounded diffs, and stronger-isolation extension points.
 
 ### Verification plane
-Baseline reproduction, tests/compile checks, regression verification, secret/SAST/dependency scanning, and independent verification.
+Baseline reproduction, project tests, compile checks, regression verification, security scanner adapters, and independent verification.
 
 ### Delivery plane
-Branch creation, commit, PR publication, evidence summary, and approval gates. Default-branch mutation is not part of the normal repair path.
+Branch creation, commit, PR publication, evidence summary, and approval gates. Normal operation does not mutate the default branch.
 
 ### Observability plane
-Structured run events, evidence manifests, trace/metric hooks, model/tool cost metadata, and OpenTelemetry/Langfuse/Prometheus/Grafana-compatible paths.
+Structured events, evidence manifests, trace/metric hooks, model/tool cost metadata, and OpenTelemetry/Langfuse/Prometheus/Grafana-compatible paths.
 
-## Repository architecture
+## Repository layout
 
 ```text
 .
-├── install.ps1 / install.sh       # one-command setup + verification
-├── v2/
-│   ├── app/
-│   │   ├── api.py                 # HTTP control plane
-│   │   ├── audit.py               # evidence ledger
-│   │   ├── cli.py                 # operator CLI + research command
-│   │   ├── config.py              # environment/runtime configuration
-│   │   ├── engine.py              # repair state machine + research integration
-│   │   ├── github.py               # issue/checkout/provenance
-│   │   ├── llm.py                  # provider-neutral model gateway
-│   │   ├── models.py               # typed domain state
-│   │   ├── policy.py               # deterministic safety policy
-│   │   ├── research.py             # cloud/direct-URL/local research
-│   │   ├── sandbox.py              # local + Docker execution
-│   │   ├── scanners.py             # security/dependency/SAST adapters
-│   │   └── verify.py               # independent verification
-│   ├── evals/                     # executable benchmark harness
-│   ├── tests/                     # unit/security/integration tests
-│   ├── docs/                      # architecture, threat model, operations
-│   ├── console/                   # operator web console
-│   ├── infra/                     # PostgreSQL, Redis, observability
-│   ├── install.py                 # cross-platform installer
-│   ├── Dockerfile
-│   ├── docker-compose.yml
-│   └── pyproject.toml
-├── docs/DISCOVERABILITY.md        # organic search/discovery strategy
-├── .github/workflows/             # CI/security workflows
+├── install.bat / install.ps1 / install.sh
+├── pyproject.toml                 # root metadata targeting authoritative v0.3 runtime
+├── README.md
 ├── SECURITY.md
-└── LICENSE
+├── docs/
+│   ├── DISCOVERABILITY.md
+│   ├── SIA_CORE_ALIGNMENT.md
+│   ├── architecture.md
+│   ├── evaluation.md
+│   ├── flow.md
+│   ├── operations.md
+│   ├── security.md
+│   └── threat-model.md
+├── .github/workflows/
+│   ├── ci.yml
+│   └── security.yml
+└── v2/                            # historical workspace name; authoritative v0.3 implementation
+    ├── app/                       # API, engine, policy, sandbox, research, verification, etc.
+    ├── evals/                     # executable benchmark harness and fixtures
+    ├── tests/                     # unit, security, adversarial and regression tests
+    ├── console/                   # operator UI
+    ├── infra/                     # persistence/observability infrastructure
+    ├── docs/                      # implementation-specific architecture and threat docs
+    ├── install.py
+    ├── Dockerfile
+    ├── docker-compose.yml
+    └── pyproject.toml
 ```
 
-`v2/` is a historical implementation workspace name. **The current release is v0.3.0.** It does not mean the project is currently “V2”. A future structural cleanup can flatten this workspace without changing the architecture contract.
+The obsolete root `app/`, `packages/`, `web/`, database schema, root Dockerfile/Compose stack, and root Makefile were removed because they represented an older pre-v0.3 architecture and were not part of the authoritative runtime.
 
 ## Safety contract
 
-The default policy is deliberately conservative:
+The default policy is conservative:
 
 - no default-branch mutation
 - no empty commands
@@ -212,48 +214,28 @@ The default policy is deliberately conservative:
 - provenance before mutation
 - fail closed when a required gate cannot run
 
-For hostile public-repository workloads, stronger isolation such as microVM-grade execution remains the production hardening path. A normal container is defence in depth, not a claim of VM-equivalent isolation.
+For hostile public-repository workloads, microVM-grade isolation remains the production hardening path. A normal container is defence in depth, not VM-equivalent isolation.
 
-## Runnable examples
+## End-to-end repair contract
 
-### Deterministic health/demo
+A successful run must preserve:
 
-```bash
-python -m app.cli demo
-```
+- run ID and timestamps
+- issue and repository identity
+- exact resolved revision
+- baseline reproduction result
+- bounded command outputs
+- diagnosis and supporting evidence
+- proposed diff and policy decision
+- security gate results
+- verification results
+- bounded reflection history
+- final commit/PR information when publication is enabled
+- machine-readable evidence manifest
 
-### Benchmark harness
+A model saying “fixed” is never sufficient.
 
-```bash
-python -m evals.harness --cases evals/cases --output evals/reports/latest.json
-```
-
-### Research without cloud search
-
-```bash
-python -m app.cli research "Python dependency failure" --repo .
-```
-
-### Research from authoritative URLs
-
-```bash
-python -m app.cli research "How does this API behave?" \
-  --url https://docs.python.org/3/
-```
-
-### Repair workflow
-
-```bash
-python -m app.cli repair OWNER/REPO ISSUE_NUMBER --repro python -m pytest -q
-```
-
-### API
-
-```bash
-uvicorn app.api:app --reload
-```
-
-## Evaluation, not marketing
+## Evaluation
 
 The executable benchmark layer measures:
 
@@ -267,7 +249,7 @@ The executable benchmark layer measures:
 - security gate outcomes
 - model/tool cost metadata when available
 
-Fixture benchmarks are **engineering verification**, not proof of real-world autonomous repair success. No performance number should be presented as a production claim without a reproducible raw report.
+Current fixture benchmarks are deterministic engineering verification, **not proof of real-world autonomous repair performance**. Production claims require reproducible raw reports.
 
 ## Self-improvement loop
 
@@ -279,19 +261,11 @@ Run → Observe → Classify failure → Preserve evidence
   → Deploy → Observe again
 ```
 
-The compounding asset is the repair evidence and benchmark corpus: every measured outcome can improve policies, routing, verification, and future repair strategies.
-
-## Who this is for
-
-- **Developers:** automate repetitive bug investigation and regression repair.
-- **SRE / platform teams:** experiment with bounded automated remediation and AIOps workflows.
-- **DevSecOps teams:** combine coding agents with policy, security scanning, provenance, and verification.
-- **AI-agent builders:** study a repository-aware, sandboxed autonomous coding architecture.
-- **Researchers:** run reproducible repair experiments instead of relying on demo screenshots or unverifiable claims.
+The compounding asset is the repair evidence and benchmark corpus: measured outcomes can improve policy, routing, verification, and future repair strategies.
 
 ## Implementation status
 
-### Substantially implemented and executable
+### Built and executable
 
 - [x] typed repair state and budgets
 - [x] GitHub issue acquisition and immutable checkout
@@ -306,13 +280,14 @@ The compounding asset is the repair evidence and benchmark corpus: every measure
 - [x] structured LLM gateway
 - [x] branch/commit/PR publisher
 - [x] approval/risk model
-- [x] executable benchmark fixtures/harness
+- [x] executable benchmark harness
 - [x] API + CLI
 - [x] operator console
-- [x] Docker/Compose stack
+- [x] Docker/Compose stack under `v2/`
 - [x] one-command installation and post-install test verification
-- [x] multi-aspect research with optional cloud + direct-URL + local fallback
-- [x] CI/security workflow surfaces
+- [x] multi-aspect research with cloud/direct-URL/local fallback
+- [x] SSRF-oriented direct URL validation
+- [x] CI/security workflow verification surfaces
 
 ### External operational dependencies
 
@@ -324,7 +299,7 @@ The compounding asset is the repair evidence and benchmark corpus: every measure
 - scanner binaries when those adapters are enabled
 - human approval/reviewer integration for governed deployments
 
-### Production hardening roadmap
+### Production hardening
 
 - microVM-grade execution backend
 - GitHub App + webhook → queue → repair → PR lifecycle
@@ -333,6 +308,14 @@ The compounding asset is the repair evidence and benchmark corpus: every measure
 - held-out learned model/strategy routing
 - multi-tenant hosted control plane
 - artifact attestations and stronger supply-chain provenance
+
+## Who this is for
+
+- **Developers:** automate repetitive bug investigation and regression repair.
+- **SRE / platform teams:** experiment with bounded automated remediation and AIOps workflows.
+- **DevSecOps teams:** combine coding agents with policy, security scanning, provenance, and verification.
+- **AI-agent builders:** study repository-aware, sandboxed autonomous coding architecture.
+- **Researchers:** run reproducible repair experiments instead of relying on unverifiable claims.
 
 ## Technology stack
 
@@ -343,7 +326,7 @@ The compounding asset is the repair evidence and benchmark corpus: every measure
 | Contracts | Pydantic v2 |
 | Agent orchestration | LangGraph boundary |
 | Model routing | LiteLLM-compatible + Ollama-compatible local path |
-| Research | Optional cloud endpoint + stdlib direct-URL + local repository retrieval |
+| Research | Optional cloud endpoint + direct URL + local retrieval |
 | Persistence | PostgreSQL + psycopg |
 | Queue | Redis |
 | Sandbox | Docker; stronger Firecracker/Kata/gVisor-class path |
@@ -351,7 +334,7 @@ The compounding asset is the repair evidence and benchmark corpus: every measure
 | Verification | pytest + project-native commands |
 | Security | Gitleaks / Semgrep / Trivy / CodeQL adapters |
 | Observability | OpenTelemetry + Langfuse-compatible path |
-| UI | Next.js / React |
+| UI | Next.js / React console |
 | Delivery | Docker Compose + GitHub Actions |
 | Evaluation | Executable benchmark harness |
 
@@ -359,11 +342,11 @@ The compounding asset is the repair evidence and benchmark corpus: every measure
 
 **Open-source repair engine → hosted repair platform → team governance/security → enterprise/on-prem execution → repair benchmark/evaluation platform.**
 
-The defensible asset is not a prompt. It is the combination of **repair traces, benchmark corpus, policy engine, verification evidence, and deployment feedback**.
+The defensible asset is the combination of **repair traces, benchmark corpus, policy engine, verification evidence, and deployment feedback**—not a prompt alone.
 
 ## Security
 
-Read `SECURITY.md` and `v2/docs/THREAT_MODEL.md` before enabling autonomous PR publication. The project treats repository content, issue text, model output, research results, and tool output as untrusted data.
+Read `SECURITY.md` and `v2/docs/THREAT_MODEL.md` before enabling autonomous PR publication. Repository content, issue text, model output, research results, and tool output are all treated as untrusted data.
 
 ## License
 
