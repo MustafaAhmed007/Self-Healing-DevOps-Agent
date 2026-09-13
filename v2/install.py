@@ -6,7 +6,12 @@ import sys
 from pathlib import Path
 
 
+MIN_PYTHON = (3, 11)
+
+
 def main() -> int:
+    if sys.version_info < MIN_PYTHON:
+        raise SystemExit(f"Python {MIN_PYTHON[0]}.{MIN_PYTHON[1]}+ is required; found {sys.version.split()[0]}")
     root = Path(__file__).resolve().parent
     venv = root / ".venv"
     python = venv / ("Scripts/python.exe" if os.name == "nt" else "bin/python")
