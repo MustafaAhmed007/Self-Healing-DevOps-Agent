@@ -1,5 +1,0 @@
-{
-  "id": "bug_001",
-  "description": "Harness smoke case: repository tests should pass.",
-  "command": ["python", "-m", "pytest", "tests/unit"]
-}
