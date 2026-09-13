@@ -1,8 +1,10 @@
 from __future__ import annotations
 
+import ipaddress
 import json
 import os
 import re
+import socket
 import urllib.request
 from dataclasses import dataclass
 from pathlib import Path
@@ -22,6 +24,8 @@ class MultiAspectResearch:
 
     Priority: configured cloud endpoint -> direct URLs -> local repository evidence.
     Cloud research is never required for a repair run to remain functional.
+    Direct URL retrieval rejects local/private destinations to avoid turning research
+    into an SSRF primitive. Operator-configured cloud endpoints remain explicit trust.
     """
 
     def __init__(self, cloud_url: str | None = None, timeout: int = 15, max_chars: int = 12000):
@@ -71,18 +75,39 @@ class MultiAspectResearch:
                     confidence="external",
                 )
                 for item in items[:8]
-                if item.get("content")
+                if isinstance(item, dict) and item.get("content")
             ]
         except Exception:
             return []
 
-    def _url(self, url: str) -> ResearchResult | None:
+    @staticmethod
+    def _public_http_url(url: str) -> bool:
         parsed = urlparse(url)
-        if parsed.scheme not in {"http", "https"} or not parsed.netloc:
+        if parsed.scheme not in {"http", "https"} or not parsed.hostname:
+            return False
+        if parsed.username or parsed.password:
+            return False
+        hostname = parsed.hostname.rstrip(".").lower()
+        if hostname in {"localhost", "localhost.localdomain"} or hostname.endswith(".local"):
+            return False
+        try:
+            addresses = {info[4][0] for info in socket.getaddrinfo(hostname, parsed.port or 443, type=socket.SOCK_STREAM)}
+        except OSError:
+            return False
+        for address in addresses:
+            ip = ipaddress.ip_address(address)
+            if ip.is_private or ip.is_loopback or ip.is_link_local or ip.is_reserved or ip.is_multicast or ip.is_unspecified:
+                return False
+        return True
+
+    def _url(self, url: str) -> ResearchResult | None:
+        if not self._public_http_url(url):
             return None
         request = urllib.request.Request(url, headers={"User-Agent": "SHDA-research/0.3"})
         try:
             with urllib.request.urlopen(request, timeout=self.timeout) as response:
+                if not self._public_http_url(response.geturl()):
+                    return None
                 body = response.read(self.max_chars * 2).decode("utf-8", errors="replace")
             text = re.sub(r"<script[\s\S]*?</script>|<style[\s\S]*?</style>", " ", body, flags=re.I)
             text = re.sub(r"<[^>]+>", " ", text)
@@ -105,7 +130,7 @@ class MultiAspectResearch:
             score = sum(1 for term in terms if term in text.lower())
             if score:
                 results.append(ResearchResult("local", str(path.relative_to(repo)), text[:4000], "repository"))
-        return sorted(results, key=lambda r: terms.intersection(set(re.findall(r"\w+", r.content.lower()))).__len__(), reverse=True)[:8]
+        return sorted(results, key=lambda r: len(terms.intersection(set(re.findall(r"\w+", r.content.lower())))), reverse=True)[:8]
 
     @staticmethod
     def _dedupe(results: list[ResearchResult]) -> list[ResearchResult]:
